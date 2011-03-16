@@ -61,6 +61,11 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_git_commit_get_parent, 0, 0, 1)
     ZEND_ARG_INFO(0, offset)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_git_commit_history, 0, 0, 1)
+    ZEND_ARG_INFO(0, callable)
+ZEND_END_ARG_INFO()
+
+
 static void php_git_commit_free_storage(php_git_commit_t *obj TSRMLS_DC)
 {
     zend_object_std_dtor(&obj->zo TSRMLS_CC);
@@ -388,6 +393,60 @@ PHP_METHOD(git_commit, getParent)
     efree(committer);
 }
 
+PHP_METHOD(git_commit, history)
+{
+    php_git_commit_t *this = (php_git_commit_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
+    zval *callable;
+    git_repository *repository = git_object_owner(this->object);
+    git_revwalk *revwalk;
+    int ret;
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,
+        "z", &callable) == FAILURE){
+        return;
+    }
+
+    zend_fcall_info fci;
+    zend_fcall_info_cache fcc;
+    if(zend_fcall_info_init(callable,0,&fci,&fcc,NULL,NULL TSRMLS_CC) != FAILURE){
+        ret = git_revwalk_new(&revwalk,repository);
+        git_oid *oid = git_object_id(this->object);
+        git_revwalk_push(revwalk,oid);
+
+        int iterate = 0;
+        while(git_revwalk_next(oid,revwalk) == GIT_SUCCESS){
+            git_commit *commit;
+            ret = git_object_lookup((git_object**)&commit, repository, oid, GIT_OBJ_COMMIT);
+            if(ret == GIT_SUCCESS){
+                zval git_commit_object;
+                zval *author;
+                zval *committer;
+                create_signature_from_commit(&author, git_commit_author(commit));
+                create_signature_from_commit(&committer, git_commit_committer(commit));
+                object_init_ex(&git_commit_object,git_commit_class_entry);
+                php_git_commit_t *cobj = (php_git_commit_t *) zend_object_store_get_object(&git_commit_object TSRMLS_CC);
+                cobj->object = commit;
+                add_property_zval(&git_commit_object,"author", author);
+                add_property_zval(&git_commit_object,"committer", committer);
+
+                zval *retval = NULL;
+                zval args;
+                array_init_size(&args, 2);
+                add_next_index_long(&args,iterate);
+                add_next_index_zval(&args,&git_commit_object);
+                zend_fcall_info_call(&fci,&fcc,&retval, &args TSRMLS_CC);
+                if(retval->type == IS_BOOL && Z_BVAL_P(retval) == 0){
+                    break;
+                }
+            }
+            iterate++;
+        }
+        git_revwalk_free(revwalk);
+    }
+    
+
+}
+
 PHPAPI function_entry php_git_commit_methods[] = {
     PHP_ME(git_commit, __construct,     arginfo_git_commit__construct,   ZEND_ACC_PUBLIC)
     PHP_ME(git_commit, setTree,         arginfo_git_commit_set_tree,     ZEND_ACC_PUBLIC)
@@ -401,6 +460,7 @@ PHPAPI function_entry php_git_commit_methods[] = {
     PHP_ME(git_commit, getShortMessage, NULL,                            ZEND_ACC_PUBLIC)
     PHP_ME(git_commit, setParent,       arginfo_git_commit_set_parent,   ZEND_ACC_PUBLIC)
     PHP_ME(git_commit, getParent,       arginfo_git_commit_get_parent,   ZEND_ACC_PUBLIC)
+    PHP_ME(git_commit, history,         arginfo_git_commit_history,      ZEND_ACC_PUBLIC) // convenience method
     {NULL, NULL, NULL}
 };
 

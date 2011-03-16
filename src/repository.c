@@ -84,6 +84,11 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_git_get_references, 0, 0, 1)
     ZEND_ARG_INFO(0, flag)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_git_branch, 0, 0, 1)
+    ZEND_ARG_INFO(0, name)
+    ZEND_ARG_INFO(0, callable)
+ZEND_END_ARG_INFO()
+
 static void php_git_repository_free_storage(php_git_repository_t *obj TSRMLS_DC)
 {
     // if added some backend. free backend before free zend_object.
@@ -601,6 +606,73 @@ PHP_METHOD(git_repository, open3)
     }
 }
 
+PHP_METHOD(git_repository, branch)
+{
+    php_git_repository_t *this= (php_git_repository_t *) zend_object_store_get_object(getThis() TSRMLS_CC);
+    char *name;
+    char *path;
+    int name_len = 0;
+    int result;
+    git_commit *commit;
+    git_reference *reference;
+    git_oid *oid;
+    zval *git_commit_object;
+    zval *callable = NULL;
+    int ret;
+    
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC,
+        "s|z", &name, &name_len, &callable) == FAILURE){
+        return;
+    }
+    path = emalloc(sizeof("refs/heads/") + name_len);
+    sprintf(path,"refs/heads/%s",name);
+
+    result = git_reference_lookup(&reference, this->repository, path);
+    efree(path);
+    if(result != GIT_SUCCESS) {
+        zend_throw_exception_ex(spl_ce_InvalidArgumentException, 0 TSRMLS_CC,
+            "Can't find specified reference.");
+        RETURN_FALSE;
+    }
+
+    oid = git_reference_oid(reference);
+    ret = git_object_lookup((git_object **)&commit, this->repository,oid , GIT_OBJ_COMMIT);
+
+    if(ret == GIT_SUCCESS){
+        zval *author;
+        zval *committer;
+
+        create_signature_from_commit(&author, git_commit_author(commit));
+        create_signature_from_commit(&committer, git_commit_committer(commit));
+
+        MAKE_STD_ZVAL(git_commit_object);
+        object_init_ex(git_commit_object,git_commit_class_entry);
+
+        php_git_commit_t *cobj = (php_git_commit_t *) zend_object_store_get_object(git_commit_object TSRMLS_CC);
+        cobj->object = commit;
+
+        add_property_zval(git_commit_object,"author", author);
+        add_property_zval(git_commit_object,"committer", committer);
+
+        if(callable != NULL){
+            zend_fcall_info fci;
+            zend_fcall_info_cache fcc;
+            if(zend_fcall_info_init(callable,0,&fci,&fcc,NULL,NULL TSRMLS_CC) != FAILURE){
+                int i;
+                zval *retval = NULL;
+                zval *args;
+                MAKE_STD_ZVAL(args);
+                array_init_size(args, 1);
+                add_next_index_zval(args,git_commit_object);
+                zend_fcall_info_call(&fci,&fcc,&retval, args TSRMLS_CC);
+            }
+        }
+        RETURN_ZVAL(git_commit_object,0,0);
+    }else{
+        RETURN_FALSE;
+    }
+}
+
 
 PHPAPI function_entry php_git_repository_methods[] = {
     PHP_ME(git_repository, __construct,   arginfo_git_construct,      ZEND_ACC_PUBLIC)
@@ -615,6 +687,7 @@ PHPAPI function_entry php_git_repository_methods[] = {
     PHP_ME(git_repository, addAlternate,  arginfo_git_add_alternate,  ZEND_ACC_PUBLIC)
     PHP_ME(git_repository, open3,         arginfo_git_open3,          ZEND_ACC_PUBLIC)
     PHP_ME(git_repository, getReferences, arginfo_git_get_references, ZEND_ACC_PUBLIC)
+    PHP_ME(git_repository, branch,        arginfo_git_branch,         ZEND_ACC_PUBLIC) // convenience method
     {NULL, NULL, NULL}
 };
 
