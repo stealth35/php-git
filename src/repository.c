@@ -334,9 +334,7 @@ PHP_METHOD(git_repository, __construct)
     if(arg_len > 0){
         ret = git_repository_open(&repository,repository_path);
         if(ret != GIT_SUCCESS){
-            zend_throw_exception_ex(spl_ce_InvalidArgumentException, 0 TSRMLS_CC,
-                "specified repository does not exist.");
-            RETURN_FALSE;
+            PHP_GIT_THROW_EXCEPTION(ret);
         }
         myobj->repository = repository;
         add_property_string_ex(object, "path",sizeof("path"),(char *)repository_path, 1 TSRMLS_CC);

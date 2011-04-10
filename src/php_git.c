@@ -28,6 +28,89 @@
 #include <string.h>
 #include <time.h>
 
+PHPAPI zend_class_entry *git_exception_class_entry;
+
+void php_git_throw_exception(int error,zend_class_entry *exception, INTERNAL_FUNCTION_PARAMETERS)
+{
+    switch(error) {
+        case GIT_ERROR:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"Operation failed, with unspecified reason.");
+            break;
+        case GIT_ENOTOID:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"Input was not a properly formatted Git object id.");
+            break;
+        case GIT_ENOTFOUND:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"Input does not exist in the scope searched.");
+            break;
+        case GIT_ENOMEM:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"Not enough space available.");
+            break;
+        case GIT_EOSERR:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"Consult the OS error information.");
+            break;
+        case GIT_EOBJTYPE:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The specified object is of invalid type.");
+            break;
+        case GIT_EOBJCORRUPTED:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The specified object has its data corrupted.");
+            break;
+        case GIT_ENOTAREPO:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The specified repository is invalid.");
+            break;
+        case GIT_EINVALIDTYPE:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The object type is invalid or doesn't match.");
+            break;
+        case GIT_EMISSINGOBJDATA:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The object cannot be written because it's missing internal data.");
+            break;
+        case GIT_EPACKCORRUPTED:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The packfile for the ODB is corrupted.");
+            break;
+        case GIT_EFLOCKFAIL:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"Failed to acquire or release a file lock.");
+            break;
+        case GIT_EZLIB:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The Z library failed to inflate/deflate an object's data.");
+            break;
+        case GIT_EBUSY:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The queried object is currently busy.");
+            break;
+        case GIT_EBAREINDEX:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The index file is not backed up by an existing repository.");
+            break;
+        case GIT_EINVALIDREFNAME:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The name of the reference is not valid.");
+            break;
+        case GIT_EREFCORRUPTED:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The specified reference has its data corrupted.");
+            break;
+        case GIT_ETOONESTEDSYMREF:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The specified symbolic reference is too deeply nested.");
+            break;
+        case GIT_EPACKEDREFSCORRUPTED:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The pack-refs file is either corrupted or its format is not currently supported.");
+            break;
+        case GIT_EINVALIDPATH:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The path is invalid.");
+            break;
+        case GIT_EREVWALKOVER:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The revision walker is empty; there are no more commits left to iterate.");
+            break;
+        case GIT_EINVALIDREFSTATE:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"The state of the reference is not valid.");
+            break;
+        case GIT_ENOTIMPLEMENTED:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"This feature has not been implemented yet.");
+            break;
+        case GIT_EEXISTS:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"A reference with this name already exists. ");
+            break;
+        default:
+            zend_throw_exception_ex(exception, 0 TSRMLS_CC,"Unhandled error code %d found.",error);
+            break;
+    }
+}
+
 PHPAPI zend_class_entry *git_class_entry;
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_git_string_to_type, 0, 0, 1)
@@ -129,6 +212,10 @@ void git_init(TSRMLS_D)
 }
 
 PHP_MINIT_FUNCTION(git) {
+    zend_class_entry exception_ce;
+    INIT_NS_CLASS_ENTRY(exception_ce, PHP_GIT_NS,"Exception", NULL);
+    git_exception_class_entry = zend_register_internal_class_ex(&exception_ce, zend_exception_get_default(), NULL TSRMLS_CC);
+
     git_init(TSRMLS_C);
     git_init_object(TSRMLS_C);
     git_init_reference(TSRMLS_C);

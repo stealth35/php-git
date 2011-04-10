@@ -38,6 +38,10 @@
 #include <git2.h>
 #include <git2/odb_backend.h>
 
+void php_git_throw_exception(int error,zend_class_entry *exception, INTERNAL_FUNCTION_PARAMETERS);
+#define PHP_GIT_THROW_EXCEPTION(error) php_git_throw_exception(error,git_exception_class_entry,INTERNAL_FUNCTION_PARAM_PASSTHRU); \
+    RETURN_FALSE;
+
 /* Define the entry point symbol
  * Zend will use when loading this module
  */
@@ -63,6 +67,7 @@ extern PHPAPI zend_class_entry *git_signature_class_entry;
 extern PHPAPI zend_class_entry *git_tag_class_entry;
 extern PHPAPI zend_class_entry *git_blob_class_entry;
 extern PHPAPI zend_class_entry *git_odb_class_entry;
+extern PHPAPI zend_class_entry *git_exception_class_entry;
 PHPAPI zend_class_entry *git_backend_class_entry;
 
 typedef struct{
