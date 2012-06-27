@@ -5,6 +5,7 @@ php:
   - 5.4
 
 before_script:
+    - git clone https://github.com/libgit2/libgit2.git
     - cd libgit2 && mkdir build && cd build && cmake .. && cmake --build . && sudo cmake --build . --target install && cd ..
     - phpize && ./configure && make && sudo make install
     - echo "extension=uv.so" >> `php --ini | grep "Loaded Configuration" | sed -e "s|.*:\s*||"`
